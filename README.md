@@ -6,6 +6,7 @@ To be able to install newer sources, you need to install Python 2.7 or Python 3.
 The best way to do that is by using pip:
 
 pip install pyyaml
+
 pip install pyelftools
 
 
