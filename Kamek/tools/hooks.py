@@ -6,7 +6,7 @@ u32 = struct.Struct('>I')
 BRANCH_TYPES = ['b', 'bl', 'ba', 'bla']
 def make_branch_insn(fromAddr, toAddr, branchType):
 	if branchType not in BRANCH_TYPES:
-		raise ValueError, 'invalid branch type: %s' % branchType
+		raise ValueError( 'invalid branch type: %s' % branchType)
 	
 	extra = BRANCH_TYPES.index(branchType)
 	
@@ -16,7 +16,7 @@ def make_branch_insn(fromAddr, toAddr, branchType):
 		distance = toAddr - fromAddr
 
 	if distance >= 0x2000000 or distance <= -0x2000000:
-		raise ValueError, 'branching too far: %08x to %08x' % (fromAddr, toAddr)
+		raise ValueError( 'branching too far: %08x to %08x' % (fromAddr, toAddr))
 	
 	return (distance & 0x3FFFFFC) | 0x48000000 | extra
 
@@ -53,7 +53,7 @@ class Hook(object):
 		for field in self.required_data:
 			field = field.replace('%BUILD%', current_build_name)
 			if field not in data:
-				raise ValueError, 'hook %s : %s is missing the field %s' % (module.moduleName, data['name'], field)
+				raise ValueError( 'hook %s : %s is missing the field %s' % (module.moduleName, data['name'], field))
 	
 	def create_patches(self):
 		pass
@@ -157,7 +157,7 @@ class NopInsnHook(Hook):
 		if isinstance(area, list):
 			addr, end = area
 			count = (end + 4 - addr) / 4
-			nop_patch = '\x60\x00\x00\x00' * count
+			nop_patch = '\x60\x00\x00\x00' * int(count)
 		else:
 			addr = area
 			nop_patch = '\x60\x00\x00\x00'

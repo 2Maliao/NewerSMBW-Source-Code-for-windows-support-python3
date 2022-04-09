@@ -1,8 +1,9 @@
-#!/usr/bin/env python
+
 
 # Kamek - build tool for custom C++ code in New Super Mario Bros. Wii
 # All rights reserved (c) Treeki 2010 - 2013
 # Header files compiled by Treeki, Tempus and megazig
+# Python3 support by 2Maliao
 
 # Requires PyYAML and pyelftools
 
@@ -17,6 +18,8 @@ import subprocess
 import sys
 import tempfile
 import yaml
+
+import elftools.elf.elffile
 
 import hooks
 from linker import DyLinkCreator
@@ -65,17 +68,17 @@ def parse_cmd_options():
 			gcc_type = arg[11:]
 		
 		if arg.startswith('--gcc-path='):
-			gcc_path = arg[11:] + '/'
+			gcc_path = arg[11:] + '\\'
 		
 		if arg.startswith('--llvm-path='):
-			llvm_path = arg[12:] + '/'
+			llvm_path = arg[12:] + '\\'
 	
 	if len(only_build) == 0:
 		only_build = None
 
 
 def print_debug(s):
-	if verbose: print '* '+str(s)
+	if verbose: print ('* '+str(s))
 
 
 def read_configs(filename):
@@ -100,48 +103,59 @@ def align_addr_up(addr, align):
 
 
 def generate_riiv_mempatch(offset, data):
+	if type(data)!=type(b''):
+		data=data.encode()
+	
 	return '<memory offset="0x%08X" value="%s" />' % (offset, binascii.hexlify(data))
 
 
 def generate_ocarina_patch(destOffset, data):
-	out = []
+	out = b''
 	count = len(data)
+	
+	if type(data)!=type(b''):
+		data=data.encode()
 	
 	sourceOffset = 0
 	destOffset -= 0x80000000
-	for i in xrange(count >> 2):
-		out.append('%08X %s' % (destOffset | 0x4000000, binascii.hexlify(data[sourceOffset:sourceOffset+4])))
+	for i in range(count >> 2):
+		out+=b'%08X %s' % (destOffset | 0x4000000, binascii.hexlify(data[sourceOffset:sourceOffset+4]))
 		sourceOffset += 4
 		destOffset += 4
 	
 	# take care
 	remainder = count % 4
 	if remainder == 3:
-		out.append('%08X 0000%s' % (destOffset | 0x2000000, binascii.hexlify(data[sourceOffset:sourceOffset+2])))
-		out.append('%08X 000000%s' % (destOffset, binascii.hexlify(data[sourceOffset+2])))
+		out+=b'%08X 0000%s' % (destOffset | 0x2000000, binascii.hexlify(data[sourceOffset:sourceOffset+2]))
+		out+=b'%08X 000000%s' % (destOffset, binascii.hexlify(str(data[sourceOffset+2]).encode()))
 	elif remainder == 2:
-		out.append('%08X 0000%s' % (destOffset | 0x2000000, binascii.hexlify(data[sourceOffset:sourceOffset+2])))
+		out+=b'%08X 0000%s' % (destOffset | 0x2000000, binascii.hexlify(data[sourceOffset:sourceOffset+2]))
 	elif remainder == 1:
-		out.append('%08X 000000%s' % (destOffset, binascii.hexlify(data[sourceOffset])))
+		out+=b'%08X 000000%s' % (destOffset, binascii.hexlify(data[sourceOffset]))
 	
-	return '\n'.join(out)
+	return out
 
 
 def generate_kamek_patches(patchlist):
-	kamekpatch = ''
+	kamekpatch = b''
+		
 	for patch in patchlist:
+		p1_byte=patch[1]
+		if type(p1_byte)!=type(b''):
+			p1_byte=p1_byte.encode()
+				
 		if len(patch[1]) > 4:
 			# block patch
-			kamekpatch += u32.pack(align_addr_up(len(patch[1]), 4) / 4)
+			kamekpatch += u32.pack(int(align_addr_up(len(patch[1]), 4) / 4))
 			kamekpatch += u32.pack(patch[0])
-			kamekpatch += patch[1]
+			kamekpatch += p1_byte
 			# align it
 			if len(patch[1]) % 4 != 0:
-				kamekpatch += '\0' * (4 - (len(patch[1]) % 4))
+				kamekpatch += b'\0' * (4 - (len(patch[1]) % 4))
 		else:
 			# single patch
 			kamekpatch += u32.pack(patch[0])
-			kamekpatch += patch[1]
+			kamekpatch += p1_byte
 	
 	kamekpatch += u32.pack(0xFFFFFFFF)
 	return kamekpatch
@@ -165,12 +179,12 @@ class KamekModule(object):
 		
 		self.data = yaml.safe_load(self.rawData)
 		if not isinstance(self.data, dict):
-			raise ValueError, 'the module file %s is an invalid format (it should be a YAML mapping)' % self.moduleName
+			raise ValueError( 'the module file %s is an invalid format (it should be a YAML mapping)' % self.moduleName)
 		
 		# verify it
 		for field in self._requiredFields:
 			if field not in self.data:
-				raise ValueError, 'Missing field in the module file %s: %s' % (self.moduleName, field)
+				raise ValueError( 'Missing field in the module file %s: %s' % (self.moduleName, field))
 
 
 
@@ -205,7 +219,7 @@ class KamekBuilder(object):
 			
 			# hook setup
 			self._hook_contexts = {}
-			for name, hookType in hooks.HookTypes.iteritems():
+			for name, hookType in hooks.HookTypes.items():
 				if hookType.has_context:
 					self._hook_contexts[hookType] = hookType.context_type()
 			
@@ -218,7 +232,7 @@ class KamekBuilder(object):
 			else:
 				self._multi_build = {self._config['short_name']: self._config['linker_script']}
 
-			for s_name, s_script in self._multi_build.iteritems():
+			for s_name, s_script in self._multi_build.items():
 				self.current_build_name = s_name
 
 				self._patches = []
@@ -280,7 +294,7 @@ class KamekBuilder(object):
 						hook = hookType(self, m, hookData)
 						self._hooks.append(hook)
 					else:
-						raise ValueError, 'Unknown hook type: %s' % hookData['type']
+						raise ValueError( 'Unknown hook type: %s' % hookData['type'])
 	
 	
 	def _compile_modules(self):
@@ -288,7 +302,7 @@ class KamekBuilder(object):
 		print_debug('Compiling modules')
 		
 		# gcc setup
-		cc_command = ['%s%s-gcc' % (gcc_path, gcc_type), '-nodefaultlibs', '-I.', '-fno-builtin', '-Os', '-fno-exceptions', '-fno-rtti', '-mno-sdata', '-c']
+		cc_command = ['%s%s-gcc.exe' % (gcc_path, gcc_type), '-nodefaultlibs', '-I.', '-fno-builtin', '-Os', '-fno-exceptions', '-fno-rtti', '-mno-sdata', '-c']
 		as_command = cc_command
 
 		if 'defines' in self._config:
@@ -300,7 +314,7 @@ class KamekBuilder(object):
 
 		if use_clang:
 			# This is just for cc
-			cc_command = ['%sclang' % llvm_path, '-cc1', '-fno-rtti', '-fno-threadsafe-statics', '-fshort-wchar', '-nobuiltininc', '-nostdsysteminc', '-nostdinc++', '-Os', '-Wall', '-std=c++11', '-I.', '-emit-obj']
+			cc_command = ['%sclang.exe' % llvm_path, '-cc1', '-fno-rtti', '-fno-threadsafe-statics', '-fshort-wchar', '-nobuiltininc', '-nostdsysteminc', '-nostdinc++', '-Os', '-Wall', '-std=c++11', '-I.', '-emit-obj']
 			if 'defines' in self._config:
 				for d in self._config['defines']:
 					cc_command.append('-D%s' % d)
@@ -313,9 +327,9 @@ class KamekBuilder(object):
 		for m in self.project.modules:
 			for normal_sourcefile in m.data['source_files']:
 				print_debug('Compiling %s : %s' % (m.moduleName, normal_sourcefile))
-				
 				objfile = os.path.join(self._configTempDir, '%d.o' % generate_unique_id())
 				sourcefile = os.path.join(m.moduleDir, normal_sourcefile)
+				print_debug('sourcefile: %s' % (sourcefile))
 				
 				if sourcefile.endswith('.o'):
 					new_command = ['cp', sourcefile, objfile]
@@ -338,8 +352,8 @@ class KamekBuilder(object):
 				
 				errorVal = subprocess.call(new_command)
 				if errorVal != 0:
-					print 'BUILD FAILED!'
-					print 'compiler returned %d - an error occurred while compiling %s' % (errorVal, sourcefile)
+					print ('BUILD FAILED!')
+					print ('compiler returned %d - an error occurred while compiling %s' % (errorVal, sourcefile))
 					sys.exit(1)
 				
 				self._moduleFiles.append(objfile)
@@ -355,11 +369,11 @@ class KamekBuilder(object):
 
 		print_debug('---')
 
-		self._currentMapFile = '%s/%s_linkmap.map' % (self._outDir, nice_name)
+		self._currentMapFile = '%s\\%s_linkmap.map' % (self._outDir, nice_name)
 		outname = 'object.plf' if self.dynamic_link_base else 'object.bin'
-		self._currentOutFile = '%s/%s_%s' % (self._outDir, nice_name, outname)
+		self._currentOutFile = '%s\\%s_%s' % (self._outDir, nice_name, outname)
 		
-		ld_command = ['%s%s-ld' % (gcc_path, gcc_type), '-L.']
+		ld_command = ['%s%s-ld.exe' % (gcc_path, gcc_type), '-L.']
 		ld_command.append('-o')
 		ld_command.append(self._currentOutFile)
 		if self.dynamic_link_base:
@@ -382,8 +396,8 @@ class KamekBuilder(object):
 		
 		errorVal = subprocess.call(ld_command)
 		if errorVal != 0:
-			print 'BUILD FAILED!'
-			print 'ld returned %d' % errorVal
+			print ('BUILD FAILED!')
+			print ('ld returned %d' % errorVal)
 			sys.exit(1)
 		
 		print_debug('Successfully linked %s' % short_name)
@@ -439,14 +453,14 @@ class KamekBuilder(object):
 		
 		# next up, run it through c++filt
 		print_debug('Running c++filt')
-		p = subprocess.Popen(gcc_type + '-c++filt', stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+		p = subprocess.Popen(gcc_type + '-c++filt.exe', stdin=subprocess.PIPE, stdout=subprocess.PIPE)
 		
 		symbolNameList = [sym[1] for sym in self._symbols]
-		filtResult = p.communicate('\n'.join(symbolNameList))
-		filteredSymbols = filtResult[0].split('\n')
+		filtResult = p.communicate('\n'.join(symbolNameList).encode())
+		filteredSymbols = filtResult[0].split(b'\n')
 		
 		for sym, filt in zip(self._symbols, filteredSymbols):
-			sym.append(filt)
+			sym.append(filt.strip())
 		
 		print_debug('Done. All symbols complete.')
 		print_debug('Generated code is at 0x%08X .. 0x%08X' % (self._codeStart, self._codeEnd - 4))
@@ -455,12 +469,13 @@ class KamekBuilder(object):
 	def find_func_by_symbol(self, find_symbol):
 		for sym in self._symbols:
 			#if show_cmd:
-			#	out = "0x%08x - %s - %s" % (sym[0], sym[1], sym[2])
-			#	print_debug(out)
-			if sym[2] == find_symbol:
+			#out = "0x%08x - %s - %s" % (sym[0], sym[1], sym[2])
+			#print_debug(out)
+			#print_debug(find_symbol)
+			if sym[2] == find_symbol.encode():
 				return sym[0]
 		
-		raise ValueError, 'Cannot find function: %s' % find_symbol
+		raise ValueError('Cannot find function: %s' % find_symbol)
 	
 	
 	def add_patch(self, offset, data):
@@ -484,38 +499,38 @@ class KamekBuilder(object):
 		
 		if self.dynamic_link:
 			# put together the dynamic link files
-			dlcode = open('%s/%s_dlcode.bin' % (self._outDir, nice_name), 'wb')
+			dlcode = open('%s\\%s_dlcode.bin' % (self._outDir, nice_name), 'wb')
 			dlcode.write(self.dynamic_link.code)
 			dlcode.close()
 
-			dlrelocs = open('%s/%s_dlrelocs.bin' % (self._outDir, nice_name), 'wb')
+			dlrelocs = open('%s\\%s_dlrelocs.bin' % (self._outDir, nice_name), 'wb')
 			dlrelocs.write(self.dynamic_link.build_reloc_data())
 			dlrelocs.close()
 
 		else:
 			# add the outfile as a patch if not using dynamic linking
-			file = open(self._currentOutFile, 'rb')
+			file = open(self._currentOutFile, 'r')
 			patch = (self._codeStart, file.read())
 			file.close()
 
 			self._patches.append(patch)
 
 		# generate a Riivolution patch
-		riiv = open('%s/%s_riiv.xml' % (self._outDir, nice_name), 'w')
+		riiv = open('%s\\%s_riiv.xml' % (self._outDir, nice_name), 'w')
 		for patch in self._patches:
 			riiv.write(generate_riiv_mempatch(*patch) + '\n')
 		
 		riiv.close()
 		
 		# generate an Ocarina patch
-		ocarina = open('%s/%s_ocarina.txt' % (self._outDir, nice_name), 'w')
+		ocarina = open('%s\\%s_ocarina.txt' % (self._outDir, nice_name), 'w')
 		for patch in self._patches:
-			ocarina.write(generate_ocarina_patch(*patch) + '\n')
+			ocarina.write(generate_ocarina_patch(*patch).decode() + '\n')
 		
 		ocarina.close()
 		
 		# generate a KamekPatcher patch
-		kpatch = open('%s/%s_loader.bin' % (self._outDir, nice_name), 'wb')
+		kpatch = open('%s\\%s_loader.bin' % (self._outDir, nice_name), 'wb')
 		kpatch.write(generate_kamek_patches(self._patches))
 		kpatch.close()
 		
@@ -538,12 +553,12 @@ class KamekProject(object):
 		
 		self.data = yaml.safe_load(self.rawData)
 		if not isinstance(self.data, dict):
-			raise ValueError, 'the project file is an invalid format (it should be a YAML mapping)'
+			raise ValueError( 'the project file is an invalid format (it should be a YAML mapping)')
 		
 		# verify it
 		for field in self._requiredFields:
 			if field not in self.data:
-				raise ValueError, 'Missing field in the project file: %s' % field
+				raise ValueError('Missing field in the project file: %s' % field)
 		
 		# load each module
 		self.modules = []
@@ -564,11 +579,12 @@ class KamekProject(object):
 
 
 def main():
-	print version_str
-	print
+	print (version_str)
+	print ('Python3 Support By 2Maliao')
+	print()
 	
 	if len(sys.argv) < 2:
-		print 'No input file specified'
+		print ('No input file specified')
 		sys.exit()
 	
 	parse_cmd_options()

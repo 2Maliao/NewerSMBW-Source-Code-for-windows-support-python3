@@ -25,7 +25,7 @@ def read_class_name(idx, name):
 		ns_elem_ct = int(name[idx + 1])
 		ns_elems = []
 		idx += 2
-		for i in xrange(ns_elem_ct):
+		for i in range(ns_elem_ct):
 			idx, n = read_vl_string(idx, name)
 			ns_elems.append(n)
 		return idx, ns_elems
@@ -304,7 +304,7 @@ def read_type(idx, name, unsigned=False):
 		idx, atype = read_type(idx, name)
 		return idx, Array(atype, size)
 	else:
-		print 'Unknown: ' + char + ' @ ' + name
+		print ('Unknown: ' + char + ' @ ' + name)
 		return idx, None
 
 def read_func_params(idx, name):
@@ -628,8 +628,8 @@ def do_mapfile(src, dest, fix_offset):
 						try:
 							name = fixmes[old_name]
 						except KeyError:
-							print "FIX ME!"
-							print old_name
+							print( "FIX ME!")
+							print (old_name)
 				# print 'OUT: ' + name
 
 			offs = int(line[pos:pos+10], 0)
@@ -678,7 +678,7 @@ def work_on_hook(hook, id, func):
 			hook['area_%s' % id] = new_area
 
 	except:
-		print 'Key Error %s for %s (%s) for %s' % (error, hook['name'], hook['type'], id)
+		print ('Key Error %s for %s (%s) for %s' % (error, hook['name'], hook['type'], id))
 
 	#if hook['name'] == 'WM_onCreate': print hook
 
@@ -687,7 +687,7 @@ def do_module(src, dest):
 	m = yaml.safe_load(open(src, 'r').read())
 
 	if 'hooks' in m:
-		for id, func in fix_for.iteritems():
+		for id, func in fix_for.items():
 			for hook in m['hooks']:
 				work_on_hook(hook, id, func)
 

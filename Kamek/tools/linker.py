@@ -49,7 +49,7 @@ class DyLinkCreator(object):
 		self._process_relocs()
 
 	def _build_blob(self):
-		code_bits = []
+		code_bits = b''
 		code_size = 0
 
 		for sect in self._sections:
@@ -60,16 +60,15 @@ class DyLinkCreator(object):
 				sect.blob_base = code_size
 				sect.rela_sect = self.elf.get_section_by_name('.rela' + sect.name)
 
-				code_bits.append(data)
+				code_bits+=data
 				code_size += len(data)
 				aligned_size = (code_size + 3) & ~3
 
 				if aligned_size > code_size:
-					code_bits.append('\0' * (aligned_size - code_size))
+					code_bits+='\0' * (aligned_size - code_size)
 			else:
 				sect.in_blob = False
-
-		self.code = ''.join(code_bits)
+		self.code = code_bits
 
 	def _process_symbols(self):
 		sym_section = self.elf.get_section_by_name('.symtab')
@@ -88,7 +87,7 @@ class DyLinkCreator(object):
 				sym.is_external = True
 				sym.address = value
 			elif shndx == 'SHN_UNDEF':
-				print 'Unknown symbol => ' + sym.name + ' (v:' + str(value) + ')'
+				print ('Unknown symbol => ' + sym.name + ' (v:' + str(value) + ')')
 			else:
 				# print '%s + 0x%x => %s' % (self._sections[shndx].name, value, sym.name)
 				section = self._sections[shndx]
@@ -98,7 +97,7 @@ class DyLinkCreator(object):
 					sym.address = section.blob_base + value
 				else:
 					if section.name != '.group':
-						print 'Section not included in blob: %s (required for %s)' % (section.name, sym.name)
+						print ('Section not included in blob: %s (required for %s)' % (section.name, sym.name))
 
 		self._symbols = syms
 
@@ -121,7 +120,7 @@ class DyLinkCreator(object):
 						symbol.address + entry['r_addend'],
 						symbol.name)
 				else:
-					print 'Failed relocation: %s+0x%x => %s+0x%x' % (sect.name, entry['r_offset'], symbol.name, entry['r_addend'])
+					print ('Failed relocation: %s+0x%x => %s+0x%x' % (sect.name, entry['r_offset'], symbol.name, entry['r_addend']))
 
 
 
@@ -147,9 +146,17 @@ class DyLinkCreator(object):
 		rel_data = map(lambda x: rel_struct_pack((x[0] << 24) | x[2], x[1]), self._relocs)
 		target_data = map(target_struct_pack, self._targets)
 
-		header = header_struct.pack('NewerREL', 12 + (len(self._relocs) * 8))
+		rel_data_byte=b''
+		for i in list(rel_data):
+			rel_data_byte += i
+			
+		target_data_byte=b''
+		for i in list(target_data):
+			target_data_byte += i
 
-		return header + ''.join(rel_data) + ''.join(target_data)
+		header = header_struct.pack('NewerREL'.encode(), 12 + (len(self._relocs) * 8))
+
+		return header + rel_data_byte + target_data_byte
 
 
 
