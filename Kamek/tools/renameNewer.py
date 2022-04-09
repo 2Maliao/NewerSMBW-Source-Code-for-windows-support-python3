@@ -21,4 +21,11 @@ os.rename('NewerASM/n_jpn2_loader.bin', 'Build/SystemJP_2.bin')
 os.rename('NewerASM/n_jpn2_dlcode.bin', 'Build/DLCodeJP_2.bin')
 os.rename('NewerASM/n_jpn2_dlrelocs.bin', 'Build/DLRelocsJP_2.bin')
 
+os.rename('NewerASM/n_kor_loader.bin', 'Build/SystemKR_3.bin')
+os.rename('NewerASM/n_kor_dlcode.bin', 'Build/DLCodeKR_3.bin')
+os.rename('NewerASM/n_kor_dlrelocs.bin', 'Build/DLRelocsKR_3.bin')
+os.rename('NewerASM/n_twn_loader.bin', 'Build/SystemTW_4.bin')
+os.rename('NewerASM/n_twn_dlcode.bin', 'Build/DLCodeTW_4.bin')
+os.rename('NewerASM/n_twn_dlrelocs.bin', 'Build/DLRelocsTW_4.bin')
+
 print('* Files Renamed and placed in the Build folder')
